@@ -171,13 +171,6 @@ def highlight_pdf(
     doc.close()
 
 
-def highlight_paper(in_path: str, out_path: str) -> None:
-    texts: List[str] = extract_text(in_path)
-    concepts: List[Set[str]] = ask_ollama(texts)
-    colors: Dict[str, Color] = gen_colors(concepts)
-    highlight_pdf(in_path, out_path, colors)
-
-
 def parse_args() -> argparse.Namespace:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Highlight detected proper nouns in a PDF paper."
@@ -192,7 +185,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args: argparse.Namespace = parse_args()
-    highlight_paper(args.input_pdf, args.output_pdf)
+    texts: List[str] = extract_text(args.input_pdf)
+    concepts: List[Set[str]] = ask_ollama(texts)
+    colors: Dict[str, Color] = gen_colors(concepts)
+    highlight_pdf(args.input_pdf, args.output_pdf, colors)
 
 
 if __name__ == "__main__":
