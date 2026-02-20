@@ -28,14 +28,21 @@ def extract_text(pdf_path: str) -> List[str]:
     return text_parts
 
 
-class Concepts(BaseModel):
-    concepts: List[List[str]]
+class Concept(BaseModel):
+    synonyms: List[str]
 
+class Concepts(BaseModel):
+    concepts: List[Concept]
+
+MAX_CONCEPTS = 48
 
 def ask_page(page:int, text: str) -> List[Set[str]]:
+    print("input text:")
+    print(text[:12000])
     prompt: str = (
-        "Extract all proper nouns and their acronyms, such as the name of methods, models, "
-        "algorithms, datasets, theorems, systems, etc. in the paper.\n"
+        "Extract all concepts and their acronyms, such as the name of methods, models, "
+        "algorithms, datasets, theorems, systems, etc. that are the key topics of the paper, "
+        "in the decreasing order of importance.\n"
         "Synonyms must be grouped together as a single concept.\n"
         "Return them in the required JSON schema."
         f"\n\n{text[:12000]}"
@@ -50,13 +57,13 @@ def ask_page(page:int, text: str) -> List[Set[str]]:
 
     parsed: Concepts = Concepts.model_validate_json(response.response)
 
-    concepts = [set(concept) for concept in parsed.concepts]
+    concepts = [set(concept.synonyms) for concept in parsed.concepts]
 
     print(f"extracted concepts in page {page}:")
-    for concept in concepts:
+    for i, concept in enumerate(concepts):
         print(", ".join(sorted(concept)))
 
-    return concepts
+    return concepts[:MAX_CONCEPTS]
 
 
 
@@ -117,7 +124,7 @@ def gen_colors(concepts: List[Set[str]]) -> Dict[str, Color]:
         pos: int = idx % max_per_ring
 
         if ring >= len(variations):
-            raise ValueError("Too many concepts (max supported: 48)")
+            raise ValueError(f"Too many concepts (max supported: {MAX_CONCEPTS})")
 
         s, v = variations[ring]
 
