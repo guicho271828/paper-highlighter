@@ -33,9 +33,9 @@ class Concepts(BaseModel):
 
 def ask_ollama(text: str) -> List[List[str]]:
     prompt: str = (
-        "Extract all proper nouns referring to method names, model names, "
-        "algorithm names, dataset names, or named systems in the paper.\n"
-        "Synonums, including abbreviations, must be grouped together as a single concept.\n"
+        "Extract all proper nouns and their acronyms, such as the name of methods, models, "
+        "algorithms, datasets, theorems, systems, etc. in the paper.\n"
+        "Synonyms must be grouped together as a single concept.\n"
         "Return them in the required JSON schema."
         f"\n\n{text[:12000]}"
     )
@@ -52,6 +52,9 @@ def ask_ollama(text: str) -> List[List[str]]:
         list(set(concept))
         for concept in parsed.concepts
     ]
+    print("extracted concepts:")
+    for concept in concepts:
+        print(", ".join(concept))
 
     return concepts
 
