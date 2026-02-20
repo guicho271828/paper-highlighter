@@ -27,14 +27,15 @@ def extract_text(pdf_path: str) -> str:
     return "\n".join(text_parts)
 
 
-class NounList(BaseModel):
-    nouns: List[str]
+class Concepts(BaseModel):
+    concepts: List[List[str]]
 
 
-def ask_ollama(text: str) -> List[str]:
+def ask_ollama(text: str) -> List[List[str]]:
     prompt: str = (
         "Extract all proper nouns referring to method names, model names, "
         "algorithm names, dataset names, or named systems in the paper.\n"
+        "Synonums, including abbreviations, must be grouped together as a single concept.\n"
         "Return them in the required JSON schema."
         f"\n\n{text[:12000]}"
     )
@@ -42,21 +43,24 @@ def ask_ollama(text: str) -> List[str]:
     response: GenerateResponse = ollama.generate(
         model=OLLAMA_MODEL,
         prompt=prompt,
-        format=NounList.model_json_schema(),
+        format=Concepts.model_json_schema(),
         stream=False,
     )
 
-    parsed: NounList = NounList.model_validate_json(response.response)
-    nouns: List[str] = list(set(parsed.nouns))
+    parsed: Concepts = Concepts.model_validate_json(response.response)
+    concepts: List[List[str]] = [
+        list(set(concept))
+        for concept in parsed.concepts
+    ]
 
-    return nouns
+    return concepts
 
 
 Color = Tuple[float, float, float]
 
 
-def gen_colors(nouns: List[str]) -> Dict[str, Color]:
-    max_per_ring: int = min(12, len(nouns))
+def gen_colors(concepts: List[List[str]]) -> Dict[str, Color]:
+    max_per_ring: int = min(12, len(concepts))
     variations: List[Tuple[float, float]] = [
         (1.0, 1.0),   # full saturation, full value
         (0.5, 1.0),   # lighter (half saturation)
@@ -65,14 +69,14 @@ def gen_colors(nouns: List[str]) -> Dict[str, Color]:
     ]
 
     colors: Dict[str, Color] = {}
-    n: int = len(nouns)
+    n: int = len(concepts)
 
-    for idx, noun in enumerate(nouns):
+    for idx, concept in enumerate(concepts):
         ring: int = idx // max_per_ring
         pos: int = idx % max_per_ring
 
         if ring >= len(variations):
-            raise ValueError("Too many nouns (max supported: 48)")
+            raise ValueError("Too many concepts (max supported: 48)")
 
         s, v = variations[ring]
 
@@ -81,7 +85,8 @@ def gen_colors(nouns: List[str]) -> Dict[str, Color]:
         h: float = (0.5 + pos * hue_step) % 1.0
 
         r, g, b = colorsys.hsv_to_rgb(h, s, v)
-        colors[noun] = (r, g, b)
+        for synonym in concept:
+            colors[synonym] = (r, g, b)
 
     return colors
 
@@ -108,8 +113,8 @@ def highlight_pdf(
 
 def highlight_paper(in_path: str, out_path: str) -> None:
     text: str = extract_text(in_path)
-    nouns: List[str] = ask_ollama(text)
-    colors: Dict[str, Color] = gen_colors(nouns)
+    concepts: List[List[str]] = ask_ollama(text)
+    colors: Dict[str, Color] = gen_colors(concepts)
     highlight_pdf(in_path, out_path, colors)
 
 
