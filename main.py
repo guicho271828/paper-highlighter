@@ -9,7 +9,7 @@ from ollama import GenerateResponse
 from pydantic import BaseModel
 
 OLLAMA_URL: str = "http://localhost:11434/api/generate"
-OLLAMA_MODEL: str = "llama3"
+OLLAMA_MODEL: str = "qwen3:8b"
 
 
 def extract_text(pdf_path: str) -> str:
