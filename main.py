@@ -94,6 +94,14 @@ def gen_colors(concepts: List[List[str]]) -> Dict[str, Color]:
     return colors
 
 
+
+def rect_overlap(a: fitz.Rect, b: fitz.Rect) -> float:
+    inter: fitz.Rect = a & b
+    if inter.is_empty:
+        return 0.0
+    return inter.get_area() / min(a.get_area(), b.get_area())
+
+
 def highlight_pdf(
     in_path: str,
     out_path: str,
@@ -102,13 +110,24 @@ def highlight_pdf(
     doc: fitz.Document = fitz.open(in_path)
 
     for page in doc:
+        used: List[fitz.Rect] = []
+
         for noun, color in colors.items():
             areas: List[fitz.Rect] = page.search_for(noun)
 
             for rect in areas:
+                rect = rect + (-1, -1, 1, 1)  # slight padding
+
+                # skip if heavy overlap (>40%) with existing highlight
+                if any(rect_overlap(rect, u) > 0.4 for u in used):
+                    continue
+
                 annot: fitz.Annot = page.add_highlight_annot(rect)
                 annot.set_colors(stroke=color)
+                # annot.set_opacity(0.35)  # reduce stacking darkness
                 annot.update()
+
+                used.append(rect)
 
     doc.save(out_path)
     doc.close()
