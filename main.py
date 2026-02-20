@@ -1,8 +1,12 @@
+#!/bin/env python
+
 import fitz  # PyMuPDF
 import colorsys
 import ollama
 import json
 import random
+import argparse
+
 from typing import List, Dict, Tuple, Set, TypedDict
 
 from ollama import GenerateResponse
@@ -109,7 +113,22 @@ def highlight_paper(in_path: str, out_path: str) -> None:
     highlight_pdf(in_path, out_path, colors)
 
 
+def parse_args() -> argparse.Namespace:
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description="Highlight detected proper nouns in a PDF paper."
+    )
+
+    parser.add_argument("input_pdf", type=str, help="Path to input PDF file")
+
+    parser.add_argument("output_pdf", type=str, help="Path to output highlighted PDF file")
+
+    return parser.parse_args()
+
+
+def main() -> None:
+    args: argparse.Namespace = parse_args()
+    highlight_paper(args.input_pdf, args.output_pdf)
+
+
 if __name__ == "__main__":
-    input_pdf: str = "paper.pdf"
-    output_pdf: str = "paper_highlighted.pdf"
-    highlight_paper(input_pdf, output_pdf)
+    main()
