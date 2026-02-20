@@ -1,9 +1,12 @@
 import fitz  # PyMuPDF
-import requests
+import colorsys
+import ollama
 import json
 import random
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple, Set, TypedDict
 
+from ollama import GenerateResponse
+from pydantic import BaseModel
 
 OLLAMA_URL: str = "http://localhost:11434/api/generate"
 OLLAMA_MODEL: str = "llama3"
@@ -20,47 +23,61 @@ def extract_text(pdf_path: str) -> str:
     return "\n".join(text_parts)
 
 
+class NounList(BaseModel):
+    nouns: List[str]
+
+
 def ask_ollama(text: str) -> List[str]:
     prompt: str = (
         "Extract all proper nouns referring to method names, model names, "
-        "algorithm names, dataset names, or named systems in the following paper.\n"
-        "Return them as a JSON list of unique strings.\n\n"
-        f"{text[:12000]}"
+        "algorithm names, dataset names, or named systems in the paper.\n"
+        "Return them in the required JSON schema."
+        f"\n\n{text[:12000]}"
     )
 
-    payload: Dict[str, object] = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
-        "stream": False
-    }
+    response: GenerateResponse = ollama.generate(
+        model=OLLAMA_MODEL,
+        prompt=prompt,
+        format=NounList.model_json_schema(),
+        stream=False,
+    )
 
-    response: requests.Response = requests.post(OLLAMA_URL, json=payload)
-    result: Dict[str, object] = response.json()
+    parsed: NounList = NounList.model_validate_json(response.response)
+    nouns: List[str] = list(set(parsed.nouns))
 
-    raw: str = result["response"]  # type: ignore
-    try:
-        nouns: List[str] = json.loads(raw)
-    except Exception:
-        nouns = []
-
-    return list(set(nouns))
+    return nouns
 
 
-def gen_colors(nouns: List[str]) -> Dict[str, Tuple[float, float, float]]:
-    colors: Dict[str, Tuple[float, float, float]] = {}
-    used: Set[Tuple[float, float, float]] = set()
+Color = Tuple[float, float, float]
 
-    for noun in nouns:
-        while True:
-            color: Tuple[float, float, float] = (
-                random.random(),
-                random.random(),
-                random.random()
-            )
-            if color not in used:
-                used.add(color)
-                colors[noun] = color
-                break
+
+def gen_colors(nouns: List[str]) -> Dict[str, Color]:
+    max_per_ring: int = min(12, len(nouns))
+    variations: List[Tuple[float, float]] = [
+        (1.0, 1.0),   # full saturation, full value
+        (0.5, 1.0),   # lighter (half saturation)
+        (1.0, 0.5),   # darker (half value)
+        (0.5, 0.5),   # muted dark
+    ]
+
+    colors: Dict[str, Color] = {}
+    n: int = len(nouns)
+
+    for idx, noun in enumerate(nouns):
+        ring: int = idx // max_per_ring
+        pos: int = idx % max_per_ring
+
+        if ring >= len(variations):
+            raise ValueError("Too many nouns (max supported: 48)")
+
+        s, v = variations[ring]
+
+        # Even hue spacing starting at cyan (H=0.5)
+        hue_step: float = 1.0 / max_per_ring
+        h: float = (0.5 + pos * hue_step) % 1.0
+
+        r, g, b = colorsys.hsv_to_rgb(h, s, v)
+        colors[noun] = (r, g, b)
 
     return colors
 
@@ -68,7 +85,7 @@ def gen_colors(nouns: List[str]) -> Dict[str, Tuple[float, float, float]]:
 def highlight_pdf(
     in_path: str,
     out_path: str,
-    colors: Dict[str, Tuple[float, float, float]]
+    colors: Dict[str, Color]
 ) -> None:
     doc: fitz.Document = fitz.open(in_path)
 
@@ -88,7 +105,7 @@ def highlight_pdf(
 def highlight_paper(in_path: str, out_path: str) -> None:
     text: str = extract_text(in_path)
     nouns: List[str] = ask_ollama(text)
-    colors: Dict[str, Tuple[float, float, float]] = gen_colors(nouns)
+    colors: Dict[str, Color] = gen_colors(nouns)
     highlight_pdf(in_path, out_path, colors)
 
 

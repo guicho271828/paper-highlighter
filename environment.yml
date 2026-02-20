@@ -7,8 +7,9 @@ dependencies:
   - pip
   - pip:
     - pymupdf
-    - requests
     - ollama
+    - mypy
+    - pydantic
     - git+https://github.com/guicho271828/fattrace.git#egg=fattrace
 
 
