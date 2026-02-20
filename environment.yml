@@ -1,0 +1,14 @@
+name: pdf_highligher
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - uv
+  - pip
+  - pip:
+    - pymupdf
+    - requests
+    - ollama
+    - git+https://github.com/guicho271828/fattrace.git#egg=fattrace
+
+
