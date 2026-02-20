@@ -40,12 +40,14 @@ def ask_ollama(text: str) -> List[List[str]]:
         f"\n\n{text[:12000]}"
     )
 
+    print(f"{OLLAMA_MODEL} is thinking ...")
     response: GenerateResponse = ollama.generate(
         model=OLLAMA_MODEL,
         prompt=prompt,
         format=Concepts.model_json_schema(),
         stream=False,
     )
+    print("done!")
 
     parsed: Concepts = Concepts.model_validate_json(response.response)
     concepts: List[List[str]] = [
