@@ -7,6 +7,7 @@ import json
 import random
 import argparse
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Set, TypedDict
 
 from ollama import GenerateResponse
@@ -16,7 +17,7 @@ OLLAMA_URL: str = "http://localhost:11434/api/generate"
 OLLAMA_MODEL: str = "qwen3:8b"
 
 
-def extract_text(pdf_path: str) -> str:
+def extract_text(pdf_path: str) -> List[str]:
     doc: fitz.Document = fitz.open(pdf_path)
     text_parts: List[str] = []
 
@@ -24,14 +25,14 @@ def extract_text(pdf_path: str) -> str:
         text_parts.append(page.get_text())
 
     doc.close()
-    return "\n".join(text_parts)
+    return text_parts
 
 
 class Concepts(BaseModel):
     concepts: List[List[str]]
 
 
-def ask_ollama(text: str) -> List[List[str]]:
+def ask_page(page:int, text: str) -> List[Set[str]]:
     prompt: str = (
         "Extract all proper nouns and their acronyms, such as the name of methods, models, "
         "algorithms, datasets, theorems, systems, etc. in the paper.\n"
@@ -40,23 +41,58 @@ def ask_ollama(text: str) -> List[List[str]]:
         f"\n\n{text[:12000]}"
     )
 
-    print(f"{OLLAMA_MODEL} is thinking ...")
     response: GenerateResponse = ollama.generate(
         model=OLLAMA_MODEL,
         prompt=prompt,
         format=Concepts.model_json_schema(),
         stream=False,
     )
-    print("done!")
 
     parsed: Concepts = Concepts.model_validate_json(response.response)
-    concepts: List[List[str]] = [
-        list(set(concept))
-        for concept in parsed.concepts
-    ]
+
+    concepts = [set(concept) for concept in parsed.concepts]
+
+    print(f"extracted concepts in page {page}:")
+    for concept in concepts:
+        print(", ".join(sorted(concept)))
+
+    return concepts
+
+
+
+def merge_concepts(concepts_over_pages: List[List[Set[str]]]) -> List[Set[str]]:
+    merged: List[Set[str]] = []
+
+    for concepts_per_page in concepts_over_pages:
+        for concept in concepts_per_page:
+            for merged_concept in merged:
+                if concept & merged_concept:
+                    merged_concept |= concept
+                    break
+            else:
+                merged.append(concept)
+
+    return merged
+
+
+def ask_ollama(texts: List[str], workers: int = 4) -> List[Set[str]]:
+    print(f"{OLLAMA_MODEL} is thinking in parallel ...")
+
+    results: List[List[Set[str]]] = []
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(ask_page, page, text) for page, text in enumerate(texts)]
+
+        for future in as_completed(futures):
+            results.append(future.result())
+
+    print("done!")
+
+    concepts: List[Set[str]] = merge_concepts(results)
+
     print("extracted concepts:")
     for concept in concepts:
-        print(", ".join(concept))
+        print(", ".join(sorted(concept)))
 
     return concepts
 
@@ -64,7 +100,7 @@ def ask_ollama(text: str) -> List[List[str]]:
 Color = Tuple[float, float, float]
 
 
-def gen_colors(concepts: List[List[str]]) -> Dict[str, Color]:
+def gen_colors(concepts: List[Set[str]]) -> Dict[str, Color]:
     max_per_ring: int = min(12, len(concepts))
     variations: List[Tuple[float, float]] = [
         (1.0, 1.0),   # full saturation, full value
@@ -136,8 +172,8 @@ def highlight_pdf(
 
 
 def highlight_paper(in_path: str, out_path: str) -> None:
-    text: str = extract_text(in_path)
-    concepts: List[List[str]] = ask_ollama(text)
+    texts: List[str] = extract_text(in_path)
+    concepts: List[Set[str]] = ask_ollama(texts)
     colors: Dict[str, Color] = gen_colors(concepts)
     highlight_pdf(in_path, out_path, colors)
 
