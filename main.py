@@ -1,6 +1,7 @@
 #!/bin/env python
 
 import sys
+import re
 import fitz  # PyMuPDF
 import colorsys
 import ollama
@@ -23,7 +24,9 @@ def extract_text(pdf_path: str) -> List[str]:
     text_parts: List[str] = []
 
     for page in doc:
-        text_parts.append(page.get_text())
+        text = page.get_text()
+        text = re.sub(r'^[ 0-9.,!?\-]*\n?', '', text, flags=re.MULTILINE)
+        text_parts.append(text)
 
     doc.close()
     return text_parts
