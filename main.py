@@ -200,7 +200,10 @@ def main() -> None:
     args: argparse.Namespace = parse_args()
     texts: List[str] = extract_text(args.input_pdf)
     # concepts: List[Set[str]] = extract_concepts_many(texts)
-    concepts: List[Set[str]] = extract_concepts("\n".join(texts))
+    text:str = "\n".join(texts)
+    text = re.sub(r'\b(acknowledgment|references)\b.*', '', text, flags=re.IGNORECASE | re.DOTALL)
+    print(f"input length: {len(text)}")
+    concepts: List[Set[str]] = extract_concepts(text)
     colors: Dict[str, Color] = gen_colors(concepts)
     highlight_pdf(args.input_pdf, args.output_pdf, colors)
 
