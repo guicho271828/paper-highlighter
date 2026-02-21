@@ -147,12 +147,7 @@ def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> Li
 
     concepts = [remove_substrings(set(concept.synonyms)) for concept in parsed.concepts]
 
-    print(yellow(f"*** extracted concepts in page {page} ***"))
-    for i, concept in enumerate(concepts):
-        if i < 48:
-            print(" "+", ".join(sorted(concept)))
-        else:
-            print(" "+color(", ".join(sorted(concept)), fg="gray"))
+    print_concepts(concepts)
 
     return concepts[:MAX_CONCEPTS]
 
@@ -187,16 +182,19 @@ def extract_concepts_many(texts: List[str], workers: int = 4) -> List[Set[str]]:
 
     concepts: List[Set[str]] = merge_concepts(conceptss)
 
-    concepts: List[Set[str]] = ask_merge_concepts(conceptss)
+    print_concepts(concepts)
 
-    print(red(f"*** extracted concepts ***"))
+    return concepts
+
+
+def print_concepts(concepts:List[Set[str]]):
+    print(yellow(f"*** extracted concepts ***"))
     for i, concept in enumerate(concepts):
         if i < 48:
             print(" "+", ".join(sorted(concept)))
         else:
             print(" "+color(", ".join(sorted(concept)), fg="gray"))
-
-    return concepts
+    pass
 
 
 Color = Tuple[float, float, float]
