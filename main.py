@@ -9,6 +9,16 @@ import json
 import random
 import argparse
 
+import nltk
+from nltk.corpus import words
+from nltk.tokenize import word_tokenize
+nltk.download('punkt')
+nltk.download('words')
+nltk.download('punkt_tab')
+english_vocab = set(words.words())
+
+from wordfreq import zipf_frequency
+
 from colors import color, red, blue, green, yellow
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -20,15 +30,64 @@ from pydantic import BaseModel
 OLLAMA_URL: str = "http://localhost:11434/api/generate"
 OLLAMA_MODEL: str = "qwen3:8b"
 
+def is_natural_language(text:str, verbose:bool = False) -> bool:
+    """
+    Returns True if text looks like natural language,
+    False if it looks like a math equation.
+    Assumes input is a single line string.
+    """
+
+    tokens = word_tokenize(text)
+    if not tokens:
+        return False
+
+    word_tokens = [t for t in tokens if t.isalpha()]
+    word_count = len(word_tokens)
+    english_word_tokens = [w for w in word_tokens if zipf_frequency(w, 'en') > 0]
+    english_word_count = len(english_word_tokens)
+
+    if not word_tokens:
+        return False
+
+    english_ratio = english_word_count / word_count
+    english_pseudocount, non_english_pseudocount = 1,1
+    english_ratio_bayesian = \
+        (english_pseudocount + english_word_count) / \
+        (english_pseudocount + non_english_pseudocount + word_count)
+
+    if verbose:
+        print(f"-----------------------------------------")
+        print(f"input: {text}")
+        print(f"  word_tokens: {' '.join(word_tokens)}")
+        print(f"  english_word_tokens: {' '.join(english_word_tokens)}")
+        print(f"  word_count: {word_count}")
+        print(f"  english_word_count: {english_word_count}")
+        print(f"  frequentist: {english_ratio}")
+        print(f"  bayesian: {english_ratio_bayesian}")
+        print(f"")
+
+    return english_ratio_bayesian > 0.7
+
+
+assert is_natural_language("ing, in-context retrieval, length extrapolation, and long-context understanding. Building on these",True)
+assert is_natural_language("results, we also develop hybrid architectures that strategically combine Gated DeltaNet layers with",True)
+assert is_natural_language("sliding window attention or Mamba2 layers, further enhancing both training efﬁciency and model",True)
+
+assert not is_natural_language("St = St−1 + vtk⊺",True)
+assert not is_natural_language("t ∈Rdv×dk,",True)
+assert not is_natural_language("ot = Stqt ∈Rdv",True)
+assert not is_natural_language("i=1",True)
+# assert not is_natural_language("vi",True)
+assert not is_natural_language("[t]ki⊺",True)
+assert not is_natural_language("[t] ∈Rdv×dk,",True)
+
 
 def extract_text(pdf_path: str) -> List[str]:
     doc: fitz.Document = fitz.open(pdf_path)
     text_parts: List[str] = []
 
     for page in doc:
-        text = page.get_text()
-        text = re.sub(r'^[ 0-9.,!?\-]*\n?', '', text, flags=re.MULTILINE)
-        text_parts.append(text)
+        text_parts.append(page.get_text())
 
     doc.close()
     return text_parts
@@ -216,6 +275,7 @@ def main() -> None:
     # concepts: List[Set[str]] = extract_concepts_many(texts)
     text:str = "\n".join(texts)
     text = re.sub(r'\b(acknowledgment|references)\b.*', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = "\n".join([ line for line in text.split("\n") if is_natural_language(line) ])
     print(f"input length: {len(text)}")
     concepts: List[Set[str]] = extract_concepts(text)
     colors: Dict[str, Color] = gen_colors(concepts)

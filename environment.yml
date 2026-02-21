@@ -11,6 +11,8 @@ dependencies:
     - mypy
     - pydantic
     - ansicolors
+    - nltk
+    - wordfreq
     - git+https://github.com/guicho271828/fattrace.git#egg=fattrace
 
 
