@@ -47,8 +47,9 @@ def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> Li
         "Extract all concepts and their acronyms, such as the name of methods, models, "
         "algorithms, datasets, theorems, systems, etc. that are the key topics of the paper, "
         "in the decreasing order of importance.\n"
-        "Synonyms must be grouped together as a single concept.\n"
-        "Return them in the required JSON schema."
+        "Synonyms must be grouped together as a single concept. "
+        "For example, Recurrent Neural Network and RNN are synonyms. \n"
+        "Return them in the required JSON schema.\n"
         f"\n\n{text[:charlimit]}"
     )
 
