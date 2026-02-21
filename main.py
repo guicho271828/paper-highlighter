@@ -27,9 +27,6 @@ from typing import List, Dict, Tuple, Set, TypedDict
 from ollama import GenerateResponse
 from pydantic import BaseModel
 
-OLLAMA_URL: str = "http://localhost:11434/api/generate"
-OLLAMA_MODEL: str = "qwen3:8b"
-
 ENGLISH_PSEUDOCOUNT, NON_ENGLISH_PSEUDOCOUNT, THRESHOLD = 1,1,0.8
 
 def is_natural_language(text:str, expect:bool|None = None) -> bool:
@@ -119,7 +116,7 @@ class Concepts(BaseModel):
 
 MAX_CONCEPTS = 48
 
-def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> List[Set[str]]:
+def extract_concepts(args:argparse.Namespace, text: str, page:int = 0) -> List[Set[str]]:
     prompt: str = (
         "Extract all concepts and their acronyms, such as the name of methods, models, "
         "algorithms, datasets, theorems, systems, etc. that are the key topics of the paper, "
@@ -127,15 +124,17 @@ def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> Li
         "Synonyms must be grouped together as a single concept. "
         "For example, Recurrent Neural Network and RNN are synonyms. \n"
         "Return them in the required JSON schema.\n"
-        f"\n\n{text[:charlimit]}"
+        f"\n\n{text[:args.limit]}"
     )
 
+    print(f"{args.model} is thinking ...")
     response: GenerateResponse = ollama.generate(
-        model=OLLAMA_MODEL,
+        model=args.model,
         prompt=prompt,
         format=Concepts.model_json_schema(),
         stream=False,
     )
+    print(f"done!")
 
     parsed: Concepts = Concepts.model_validate_json(response.response)
 
@@ -167,18 +166,15 @@ def merge_concepts(concepts_over_pages: List[List[Set[str]]]) -> List[Set[str]]:
     return merged
 
 
-def extract_concepts_many(texts: List[str], workers: int = 4) -> List[Set[str]]:
-    print(f"{OLLAMA_MODEL} is thinking in parallel ...")
+def extract_concepts_many(args:argparse.Namespace, texts: List[str], workers: int = 4) -> List[Set[str]]:
 
     conceptss: List[List[Set[str]]] = []
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(extract_concepts, text, page) for page, text in enumerate(texts)]
+        futures = [executor.submit(extract_concepts, args, text, page) for page, text in enumerate(texts)]
 
         for future in as_completed(futures):
             conceptss.append(future.result())
-
-    print("done!")
 
     concepts: List[Set[str]] = merge_concepts(conceptss)
 
@@ -273,12 +269,12 @@ def highlight_pdf(
 
 def parse_args() -> argparse.Namespace:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="Highlight detected proper nouns in a PDF paper."
-    )
+        description="Highlight detected proper nouns in a PDF paper.")
 
     parser.add_argument("input_pdf", type=str, help="Path to input PDF file")
-
     parser.add_argument("output_pdf", type=str, help="Path to output highlighted PDF file")
+    parser.add_argument("--model", type=str, default="qwen3:8b", help="ollama model id")
+    parser.add_argument("--limit", type=int, default=sys.maxsize, help="ollama model id")
 
     return parser.parse_args()
 
@@ -299,7 +295,7 @@ def main() -> None:
             print(color(line, fg="gray"))
     text = "\n".join(lines)
     print(f"input length: {len(text)}")
-    concepts: List[Set[str]] = extract_concepts(text)
+    concepts: List[Set[str]] = extract_concepts(args, text)
     colors: Dict[str, Color] = gen_colors(concepts)
     highlight_pdf(args.input_pdf, args.output_pdf, colors)
 
