@@ -36,7 +36,7 @@ class Concepts(BaseModel):
 
 MAX_CONCEPTS = 48
 
-def ask_page(page:int, text: str) -> List[Set[str]]:
+def extract_concepts(text: str, page:int = 0) -> List[Set[str]]:
     print("input text:")
     print(text[:12000])
     prompt: str = (
@@ -66,7 +66,6 @@ def ask_page(page:int, text: str) -> List[Set[str]]:
     return concepts[:MAX_CONCEPTS]
 
 
-
 def merge_concepts(concepts_over_pages: List[List[Set[str]]]) -> List[Set[str]]:
     merged: List[Set[str]] = []
 
@@ -82,13 +81,13 @@ def merge_concepts(concepts_over_pages: List[List[Set[str]]]) -> List[Set[str]]:
     return merged
 
 
-def ask_ollama(texts: List[str], workers: int = 4) -> List[Set[str]]:
+def extract_concepts_many(texts: List[str], workers: int = 4) -> List[Set[str]]:
     print(f"{OLLAMA_MODEL} is thinking in parallel ...")
 
     conceptss: List[List[Set[str]]] = []
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(ask_page, page, text) for page, text in enumerate(texts)]
+        futures = [executor.submit(extract_concepts, text, page) for page, text in enumerate(texts)]
 
         for future in as_completed(futures):
             conceptss.append(future.result())
@@ -96,6 +95,8 @@ def ask_ollama(texts: List[str], workers: int = 4) -> List[Set[str]]:
     print("done!")
 
     concepts: List[Set[str]] = merge_concepts(conceptss)
+
+    concepts: List[Set[str]] = ask_merge_concepts(conceptss)
 
     print("extracted concepts:")
     for concept in concepts:
@@ -193,7 +194,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args: argparse.Namespace = parse_args()
     texts: List[str] = extract_text(args.input_pdf)
-    concepts: List[Set[str]] = ask_ollama(texts)
+    # concepts: List[Set[str]] = extract_concepts_many(texts)
+    concepts: List[Set[str]] = extract_concepts("\n".join(texts))
     colors: Dict[str, Color] = gen_colors(concepts)
     highlight_pdf(args.input_pdf, args.output_pdf, colors)
 
