@@ -85,17 +85,17 @@ def merge_concepts(concepts_over_pages: List[List[Set[str]]]) -> List[Set[str]]:
 def ask_ollama(texts: List[str], workers: int = 4) -> List[Set[str]]:
     print(f"{OLLAMA_MODEL} is thinking in parallel ...")
 
-    results: List[List[Set[str]]] = []
+    conceptss: List[List[Set[str]]] = []
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(ask_page, page, text) for page, text in enumerate(texts)]
 
         for future in as_completed(futures):
-            results.append(future.result())
+            conceptss.append(future.result())
 
     print("done!")
 
-    concepts: List[Set[str]] = merge_concepts(results)
+    concepts: List[Set[str]] = merge_concepts(conceptss)
 
     print("extracted concepts:")
     for concept in concepts:
