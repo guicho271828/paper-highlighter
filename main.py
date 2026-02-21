@@ -64,7 +64,13 @@ def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> Li
 
     parsed: Concepts = Concepts.model_validate_json(response.response)
 
-    concepts = [set(concept.synonyms) for concept in parsed.concepts]
+    def remove_substrings(synonyms:set[str]) -> set[str]:
+        for s1 in synonyms:
+            if any([ (s1.lower() in s2.lower()) for s2 in synonyms ]):
+                return remove_substrings(synonyms - set([s1]))
+        return synonyms
+
+    concepts = [remove_substrings(set(concept.synonyms)) for concept in parsed.concepts]
 
     print(yellow(f"*** extracted concepts in page {page} ***"))
     for i, concept in enumerate(concepts):
