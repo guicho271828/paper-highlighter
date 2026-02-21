@@ -102,8 +102,6 @@ class Concepts(BaseModel):
 MAX_CONCEPTS = 48
 
 def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> List[Set[str]]:
-    print("input text:")
-    print(text[:charlimit])
     prompt: str = (
         "Extract all concepts and their acronyms, such as the name of methods, models, "
         "algorithms, datasets, theorems, systems, etc. that are the key topics of the paper, "
@@ -275,7 +273,15 @@ def main() -> None:
     # concepts: List[Set[str]] = extract_concepts_many(texts)
     text:str = "\n".join(texts)
     text = re.sub(r'\b(acknowledgment|references)\b.*', '', text, flags=re.IGNORECASE | re.DOTALL)
-    text = "\n".join([ line for line in text.split("\n") if is_natural_language(line) ])
+    print("input text:")
+    lines = []
+    for line in text.split("\n"):
+        if is_natural_language(line):
+            print(line)
+            lines.append(line)
+        else:
+            print(color(line, fg="gray"))
+    text = "\n".join(lines)
     print(f"input length: {len(text)}")
     concepts: List[Set[str]] = extract_concepts(text)
     colors: Dict[str, Color] = gen_colors(concepts)
