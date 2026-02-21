@@ -10,6 +10,7 @@ dependencies:
     - ollama
     - mypy
     - pydantic
+    - ansicolors
     - git+https://github.com/guicho271828/fattrace.git#egg=fattrace
 
 

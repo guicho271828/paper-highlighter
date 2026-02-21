@@ -9,6 +9,8 @@ import json
 import random
 import argparse
 
+from colors import color, red, blue, green, yellow
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Set, TypedDict
 
@@ -64,9 +66,12 @@ def extract_concepts(text: str, page:int = 0, charlimit:int = sys.maxsize) -> Li
 
     concepts = [set(concept.synonyms) for concept in parsed.concepts]
 
-    print(f"extracted concepts in page {page}:")
+    print(yellow(f"*** extracted concepts in page {page} ***"))
     for i, concept in enumerate(concepts):
-        print(", ".join(sorted(concept)))
+        if i < 48:
+            print(" "+", ".join(sorted(concept)))
+        else:
+            print(" "+color(", ".join(sorted(concept)), fg="gray"))
 
     return concepts[:MAX_CONCEPTS]
 
@@ -103,9 +108,12 @@ def extract_concepts_many(texts: List[str], workers: int = 4) -> List[Set[str]]:
 
     concepts: List[Set[str]] = ask_merge_concepts(conceptss)
 
-    print("extracted concepts:")
-    for concept in concepts:
-        print(", ".join(sorted(concept)))
+    print(red(f"*** extracted concepts ***"))
+    for i, concept in enumerate(concepts):
+        if i < 48:
+            print(" "+", ".join(sorted(concept)))
+        else:
+            print(" "+color(", ".join(sorted(concept)), fg="gray"))
 
     return concepts
 
