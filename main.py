@@ -30,7 +30,9 @@ from pydantic import BaseModel
 OLLAMA_URL: str = "http://localhost:11434/api/generate"
 OLLAMA_MODEL: str = "qwen3:8b"
 
-def is_natural_language(text:str, verbose:bool = False) -> bool:
+ENGLISH_PSEUDOCOUNT, NON_ENGLISH_PSEUDOCOUNT, THRESHOLD = 1,1,0.8
+
+def is_natural_language(text:str, expect:bool|None = None) -> bool:
     """
     Returns True if text looks like natural language,
     False if it looks like a math equation.
@@ -41,46 +43,62 @@ def is_natural_language(text:str, verbose:bool = False) -> bool:
     if not tokens:
         return False
 
-    word_tokens = [t for t in tokens if t.isalpha()]
-    word_count = len(word_tokens)
-    english_word_tokens = [w for w in word_tokens if zipf_frequency(w, 'en') > 0]
-    english_word_count = len(english_word_tokens)
+    tokens = [t for t in tokens if t.isalpha()]
+    chars = sum(map(len,tokens))
+    english_tokens = [w for w in tokens if zipf_frequency(w, 'en') > 0]
+    english_chars = sum(map(len,english_tokens))
 
-    if not word_tokens:
+    if not tokens:
         return False
 
-    english_ratio = english_word_count / word_count
-    english_pseudocount, non_english_pseudocount = 1,1
+    english_ratio = english_chars / chars
     english_ratio_bayesian = \
-        (english_pseudocount + english_word_count) / \
-        (english_pseudocount + non_english_pseudocount + word_count)
+        (ENGLISH_PSEUDOCOUNT + english_chars) / \
+        (ENGLISH_PSEUDOCOUNT + NON_ENGLISH_PSEUDOCOUNT + chars)
 
-    if verbose:
+    if expect is not None:
+        if expect != (english_ratio_bayesian > THRESHOLD):
+            print(f"input: {text}")
+            print(f"  tokens: {' '.join(tokens)}")
+            print(f"  english_tokens: {' '.join(english_tokens)}")
+            print(f"  chars: {chars}")
+            print(f"  english_chars: {english_chars}")
+            print(f"  frequentist: {english_ratio}")
+            print(f"  bayesian: {english_ratio_bayesian}")
+            print(f"")
+            assert expect == (english_ratio_bayesian > THRESHOLD)
+
+    return english_ratio_bayesian > THRESHOLD
+
+
+from itertools import product
+
+print("searching hyperparameter")
+for ENGLISH_PSEUDOCOUNT, NON_ENGLISH_PSEUDOCOUNT, THRESHOLD in \
+        product([0, 1, 5, 10],
+                [0, 1, 5, 10],
+                [1/5, 2/5, 3/5, 4/5]):
+    try:
         print(f"-----------------------------------------")
-        print(f"input: {text}")
-        print(f"  word_tokens: {' '.join(word_tokens)}")
-        print(f"  english_word_tokens: {' '.join(english_word_tokens)}")
-        print(f"  word_count: {word_count}")
-        print(f"  english_word_count: {english_word_count}")
-        print(f"  frequentist: {english_ratio}")
-        print(f"  bayesian: {english_ratio_bayesian}")
-        print(f"")
-
-    return english_ratio_bayesian > 0.7
-
-
-assert is_natural_language("ing, in-context retrieval, length extrapolation, and long-context understanding. Building on these",True)
-assert is_natural_language("results, we also develop hybrid architectures that strategically combine Gated DeltaNet layers with",True)
-assert is_natural_language("sliding window attention or Mamba2 layers, further enhancing both training efﬁciency and model",True)
-
-assert not is_natural_language("St = St−1 + vtk⊺",True)
-assert not is_natural_language("t ∈Rdv×dk,",True)
-assert not is_natural_language("ot = Stqt ∈Rdv",True)
-assert not is_natural_language("i=1",True)
-# assert not is_natural_language("vi",True)
-assert not is_natural_language("[t]ki⊺",True)
-assert not is_natural_language("[t] ∈Rdv×dk,",True)
-
+        print("ENGLISH_PSEUDOCOUNT",ENGLISH_PSEUDOCOUNT, "NON_ENGLISH_PSEUDOCOUNT",NON_ENGLISH_PSEUDOCOUNT, "THRESHOLD",THRESHOLD)
+        is_natural_language("ing, in-context retrieval, length extrapolation, and long-context understanding. Building on these",True)
+        is_natural_language("results, we also develop hybrid architectures that strategically combine Gated DeltaNet layers with",True)
+        is_natural_language("sliding window attention or Mamba2 layers, further enhancing both training efﬁciency and model",True)
+        is_natural_language("In contrast, the linear Transformer with the delta rule (Widrow et al., 1960), known as DeltaNet",True)
+        is_natural_language("St = St−1 + vtk⊺",False)
+        is_natural_language("t ∈Rdv×dk,",False)
+        is_natural_language("ot = Stqt ∈Rdv",False)
+        is_natural_language("i=1",False)
+        is_natural_language("vi",False)
+        is_natural_language("[t]ki⊺",False)
+        is_natural_language("[t] ∈Rdv×dk,",False)
+        is_natural_language("i )qt =",False)
+        is_natural_language("i qt) ∈Rdv,",False)
+        is_natural_language("t = St (I −βtktk⊺",False)
+        print(yellow("success!"))
+        break
+    except AssertionError:
+        print("failed")
 
 def extract_text(pdf_path: str) -> List[str]:
     doc: fitz.Document = fitz.open(pdf_path)
