@@ -124,10 +124,10 @@ Color = Tuple[float, float, float]
 def gen_colors(concepts: List[Set[str]]) -> Dict[str, Color]:
     max_per_ring: int = min(12, len(concepts))
     variations: List[Tuple[float, float]] = [
-        (1.0, 1.0),   # full saturation, full value
-        (0.5, 1.0),   # lighter (half saturation)
-        (1.0, 0.5),   # darker (half value)
-        (0.5, 0.5),   # muted dark
+        (4/5, 1.0),   # full saturation, full value
+        (3/5, 1.0),   # lighter (half saturation)
+        (2/5, 1.0),   # lighter (half saturation)
+        (1/5, 1.0),   # lighter (half saturation)
     ]
 
     colors: Dict[str, Color] = {}
